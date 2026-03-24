@@ -124,7 +124,7 @@ jobs:
           key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
 
       - name: Verify Plugin
-        run: ./gradlew runPluginVerifier -Pplugin.verifier.home.dir=~/.pluginVerifier
+        run: ./gradlew verifyPlugin -Pplugin.verifier.home.dir=~/.pluginVerifier
 
   releaseDraft:
     name: Release Draft

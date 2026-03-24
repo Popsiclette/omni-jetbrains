@@ -1,84 +1,113 @@
 import org.jetbrains.changelog.markdownToHTML
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
-fun properties(key: String) = project.findProperty(key).toString()
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
 plugins {
-  id("java")
-  id("org.jetbrains.kotlin.jvm") version "1.9.25"
-  id("org.jetbrains.intellij") version "1.17.4"
+  java
+  id("org.jetbrains.intellij.platform") version "2.13.1"
   id("org.jetbrains.changelog") version "1.3.1"
 }
 
-group = properties("pluginGroup")
-version = properties("pluginVersion")
+group = providers.gradleProperty("pluginGroup").get()
+version = providers.gradleProperty("pluginVersion").get()
+
+java {
+  toolchain {
+    languageVersion.set(JavaLanguageVersion.of(providers.gradleProperty("javaVersion").get().toInt()))
+  }
+}
 
 repositories {
   mavenCentral()
+  intellijPlatform {
+    defaultRepositories()
+  }
 }
 
-intellij {
-  pluginName.set(properties("pluginName"))
-  version.set(properties("platformVersion"))
-  type.set(properties("platformType"))
-  downloadSources.set(properties("platformDownloadSources").toBoolean())
-  updateSinceUntilBuild.set(true)
-
-  plugins.set(properties("platformPlugins").split(',').map(String::trim).filter(String::isNotEmpty))
+dependencies {
+  intellijPlatform {
+    intellijIdea(providers.gradleProperty("platformVersion"))
+    bundledPlugins(
+      providers.gradleProperty("platformBundledPlugins").map { line ->
+        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+      },
+    )
+    plugins(
+      providers.gradleProperty("platformPlugins").map { line ->
+        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+      },
+    )
+    bundledModules(
+      providers.gradleProperty("platformBundledModules").map { line ->
+        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+      },
+    )
+  }
 }
 
 changelog {
-  version.set(properties("pluginVersion"))
+  version.set(providers.gradleProperty("pluginVersion"))
   groups.set(emptyList())
 }
 
-tasks {
-  properties("javaVersion").let {
-    withType<JavaCompile> {
-      sourceCompatibility = it
-      targetCompatibility = it
-    }
-    withType<KotlinCompile> {
-      kotlinOptions.jvmTarget = it
-    }
-  }
+intellijPlatform {
+  buildSearchableOptions = false
+  instrumentCode = false
 
-  wrapper {
-    gradleVersion = properties("gradleVersion")
-  }
+  pluginConfiguration {
+    id = providers.gradleProperty("pluginGroup")
+    name = providers.gradleProperty("pluginName")
+    version = providers.gradleProperty("pluginVersion")
 
-  patchPluginXml {
-    version.set(properties("pluginVersion"))
-    sinceBuild.set(properties("pluginSinceBuild"))
-    untilBuild.set(properties("pluginUntilBuild"))
-
-    pluginDescription.set(
-      File("./README.md").readText().lines().run {
+    description =
+      providers.fileContents(layout.projectDirectory.file("README.md")).asText.map { text ->
         val start = "<!-- Plugin description -->"
         val end = "<!-- Plugin description end -->"
-
-        if (!containsAll(listOf(start, end))) {
+        val lines = text.lines()
+        if (!lines.containsAll(listOf(start, end))) {
           throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
         }
-        subList(indexOf(start) + 1, indexOf(end))
-      }.joinToString("\n").run { markdownToHTML(this) }
-    )
+        lines.subList(lines.indexOf(start) + 1, lines.indexOf(end)).joinToString("\n").let(::markdownToHTML)
+      }
 
-    changeNotes.set(changelog.getUnreleased().toHTML())
+    changeNotes = providers.provider { changelog.getUnreleased().toHTML() }
+
+    ideaVersion {
+      sinceBuild = providers.gradleProperty("pluginSinceBuild")
+      untilBuild = providers.gradleProperty("pluginUntilBuild")
+    }
+
+    vendor {
+      url = providers.gradleProperty("pluginVendorUrl")
+    }
   }
 
-  runPluginVerifier {
-    ideVersions.set(
-      properties("pluginVerifierIdeVersions").split(',').map(String::trim)
-        .filter(String::isNotEmpty)
-    )
+  publishing {
+    token = providers.environmentVariable("PUBLISH_TOKEN")
+    channels =
+      providers.gradleProperty("pluginVersion").map { v ->
+        listOf(v.substringAfter('-', "").substringBefore('.').ifEmpty { "default" })
+      }
+  }
+
+  pluginVerification {
+    ides {
+      providers
+        .gradleProperty("pluginVerifierIdeVersions")
+        .get()
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .forEach { build -> create(IntelliJPlatformType.IntellijIdeaUltimate, build) }
+    }
+  }
+}
+
+tasks {
+  wrapper {
+    gradleVersion = providers.gradleProperty("gradleVersion").get()
   }
 
   publishPlugin {
     dependsOn("patchChangelog")
-    token.set(System.getenv("PUBLISH_TOKEN"))
-    val channelName: String =
-      properties("pluginVersion").substringAfter('-', "default").substringBefore('.')
-    channels.set(listOf(channelName))
   }
 }
