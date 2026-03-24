@@ -45,10 +45,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     outputs:
-      name: ${{ steps.properties.outputs.name }}
       version: ${{ steps.properties.outputs.version }}
       changelog: ${{ steps.properties.outputs.changelog }}
-      artifact: ${{ steps.properties.outputs.artifact }}
+      artifact: ${{ steps.dist.outputs.name }}
     steps:
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -76,26 +75,37 @@ jobs:
         shell: bash
         run: |
           PROPERTIES="$(./gradlew properties --console=plain -q)"
-          VERSION="$(echo "$PROPERTIES" | grep "^version:" | cut -f2- -d ' ')"
-          NAME="$(echo "$PROPERTIES" | grep "^pluginName:" | cut -f2- -d ' ')"
+          VERSION="$(echo "$PROPERTIES" | grep "^version:" | head -1 | cut -f2- -d ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           CHANGELOG="$(./gradlew getChangelog --unreleased --no-header --console=plain -q)"
-          ARTIFACT="${NAME}-${VERSION}.zip"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "name=$NAME" >> $GITHUB_OUTPUT
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo "artifact=$ARTIFACT" >> $GITHUB_OUTPUT
 
       - name: Build Plugin
         run: ./gradlew buildPlugin
+
+      - name: Locate distribution ZIP
+        id: dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(build/distributions/*.zip)
+          if (( ${#zips[@]} == 0 )); then
+            echo "No plugin ZIP under build/distributions/:" >&2
+            ls -la build/distributions 2>&1 || true
+            exit 1
+          fi
+          echo "path=${zips[0]}" >> $GITHUB_OUTPUT
+          echo "name=$(basename "${zips[0]}")" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-artifact
-          path: ./build/distributions/${{ steps.properties.outputs.artifact }}
+          path: ${{ steps.dist.outputs.path }}
 
   verify:
     name: Verify
@@ -139,6 +149,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: plugin-artifact
+          path: plugin-zip
 
       - name: Create Release Draft
         uses: softprops/action-gh-release@v2
@@ -147,6 +158,6 @@ jobs:
           name: v${{ needs.build.outputs.version }}
           body: ${{ needs.build.outputs.changelog }}
           draft: true
-          files: ${{ needs.build.outputs.artifact }}
+          files: plugin-zip/${{ needs.build.outputs.artifact }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
