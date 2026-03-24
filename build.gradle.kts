@@ -77,10 +77,8 @@ tasks {
   publishPlugin {
     dependsOn("patchChangelog")
     token.set(System.getenv("PUBLISH_TOKEN"))
-    channels.set(
-      listOf(
-        properties("pluginVersion").split('-').getOrElse(1) { "default" }.split('.').first()
-      )
-    )
+    val channelName: String =
+      properties("pluginVersion").substringAfter('-', "default").substringBefore('.')
+    channels.set(listOf(channelName))
   }
 }
