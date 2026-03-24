@@ -1,19 +1,18 @@
+import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
-import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
 plugins {
   java
-  id("org.jetbrains.intellij.platform") version "2.13.1"
-  id("org.jetbrains.changelog") version "1.3.1"
+  alias(libs.plugins.kotlin)
+  alias(libs.plugins.intelliJPlatform)
+  alias(libs.plugins.changelog)
 }
 
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
-java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(providers.gradleProperty("javaVersion").get().toInt()))
-  }
+kotlin {
+  jvmToolchain(providers.gradleProperty("javaVersion").get().toInt())
 }
 
 repositories {
@@ -23,30 +22,25 @@ repositories {
   }
 }
 
+fun commaListProperty(name: String) =
+  providers.gradleProperty(name).map { line ->
+    line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+  }
+
 dependencies {
   intellijPlatform {
     intellijIdea(providers.gradleProperty("platformVersion"))
-    bundledPlugins(
-      providers.gradleProperty("platformBundledPlugins").map { line ->
-        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-      },
-    )
-    plugins(
-      providers.gradleProperty("platformPlugins").map { line ->
-        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-      },
-    )
-    bundledModules(
-      providers.gradleProperty("platformBundledModules").map { line ->
-        line.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-      },
-    )
+    bundledPlugins(commaListProperty("platformBundledPlugins"))
+    plugins(commaListProperty("platformPlugins"))
+    bundledModules(commaListProperty("platformBundledModules"))
   }
 }
 
 changelog {
+  groups.empty()
+  repositoryUrl = providers.gradleProperty("pluginRepositoryUrl")
+  versionPrefix = ""
   version.set(providers.gradleProperty("pluginVersion"))
-  groups.set(emptyList())
 }
 
 intellijPlatform {
@@ -69,16 +63,30 @@ intellijPlatform {
         lines.subList(lines.indexOf(start) + 1, lines.indexOf(end)).joinToString("\n").let(::markdownToHTML)
       }
 
-    changeNotes = providers.provider { changelog.getUnreleased().toHTML() }
+    val changelog = project.changelog
+    changeNotes =
+      providers.gradleProperty("pluginVersion").map { pluginVersion ->
+        with(changelog) {
+          renderItem(
+            (getOrNull(pluginVersion) ?: getUnreleased()).withHeader(false).withEmptySections(false),
+            Changelog.OutputType.HTML,
+          )
+        }
+      }
 
     ideaVersion {
       sinceBuild = providers.gradleProperty("pluginSinceBuild")
-      untilBuild = providers.gradleProperty("pluginUntilBuild")
     }
 
     vendor {
       url = providers.gradleProperty("pluginVendorUrl")
     }
+  }
+
+  signing {
+    certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+    privateKey = providers.environmentVariable("PRIVATE_KEY")
+    password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
   }
 
   publishing {
@@ -91,13 +99,7 @@ intellijPlatform {
 
   pluginVerification {
     ides {
-      providers
-        .gradleProperty("pluginVerifierIdeVersions")
-        .get()
-        .split(',')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .forEach { build -> create(IntelliJPlatformType.IntellijIdeaUltimate, build) }
+      recommended()
     }
   }
 }
