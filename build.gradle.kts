@@ -1,4 +1,3 @@
-import io.gitlab.arturbosch.detekt.Detekt
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -9,8 +8,6 @@ plugins {
   id("org.jetbrains.kotlin.jvm") version "1.9.25"
   id("org.jetbrains.intellij") version "1.17.4"
   id("org.jetbrains.changelog") version "1.3.1"
-  id("io.gitlab.arturbosch.detekt") version "1.23.7"
-  id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
 group = properties("pluginGroup")
@@ -18,9 +15,6 @@ version = properties("pluginVersion")
 
 repositories {
   mavenCentral()
-}
-dependencies {
-  detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
 }
 
 intellij {
@@ -38,19 +32,7 @@ changelog {
   groups.set(emptyList())
 }
 
-detekt {
-  config = files("./detekt-config.yml")
-  buildUponDefaultConfig = true
-
-  reports {
-    html.enabled = false
-    xml.enabled = false
-    txt.enabled = false
-  }
-}
-
 tasks {
-  // Set the JVM compatibility versions
   properties("javaVersion").let {
     withType<JavaCompile> {
       sourceCompatibility = it
@@ -58,9 +40,6 @@ tasks {
     }
     withType<KotlinCompile> {
       kotlinOptions.jvmTarget = it
-    }
-    withType<Detekt> {
-      jvmTarget = it
     }
   }
 

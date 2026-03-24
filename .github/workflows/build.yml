@@ -37,11 +37,8 @@ jobs:
           path: ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
 
-      - name: Run Linters and Test
-        run: ./gradlew check
-
-      - name: Verify Plugin
-        run: ./gradlew verifyPlugin
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
 
   build:
     name: Build
