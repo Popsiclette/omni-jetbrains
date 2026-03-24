@@ -6,11 +6,11 @@ fun properties(key: String) = project.findProperty(key).toString()
 
 plugins {
   id("java")
-  id("org.jetbrains.kotlin.jvm") version "1.7.20"
-  id("org.jetbrains.intellij") version "1.9.0"
+  id("org.jetbrains.kotlin.jvm") version "1.9.25"
+  id("org.jetbrains.intellij") version "1.17.4"
   id("org.jetbrains.changelog") version "1.3.1"
-  id("io.gitlab.arturbosch.detekt") version "1.21.0"
-  id("org.jlleitschuh.gradle.ktlint") version "11.0.0"
+  id("io.gitlab.arturbosch.detekt") version "1.23.7"
+  id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
 group = properties("pluginGroup")
@@ -18,10 +18,9 @@ version = properties("pluginVersion")
 
 repositories {
   mavenCentral()
-  jcenter()
 }
 dependencies {
-  detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.18.1")
+  detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
 }
 
 intellij {

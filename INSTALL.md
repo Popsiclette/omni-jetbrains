@@ -2,7 +2,7 @@
 
 #### Download files
 
-1. Go to [latest version](https://github.com/getomni/jetbrains/releases/latest)
+1. Go to [latest version](https://github.com/Popsiclette/omni-jetbrains/releases/latest)
 2. On **Assets** download **Omni.Theme-x.x.x.zip**
 
 #### Activating theme
